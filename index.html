@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BRAINROT BOZOR — Roblox Trade & Sotuv</title>
+<meta name="description" content="Steal a Brainrot, Grow a Garden va boshqa Roblox o'yinlaridagi itemlarni trade qiling yoki soting.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="wrap header-inner">
+    <a href="#top" class="logo">
+      <span class="logo-mark">🧠</span>
+      <span class="logo-text">BRAINROT<em>BOZOR</em></span>
+    </a>
+    <nav class="main-nav" aria-label="Asosiy navigatsiya">
+      <button class="nav-link is-active" data-type-filter="all">Hammasi</button>
+      <button class="nav-link" data-type-filter="trade">Tradelar</button>
+      <button class="nav-link" data-type-filter="sale">Sotuvlar</button>
+    </nav>
+    <a class="btn btn-bot" href="#" id="bot-link" target="_blank" rel="noopener">Botga o'tish →</a>
+  </div>
+</header>
+
+<main id="top">
+
+  <section class="hero">
+    <div class="wrap hero-inner">
+      <p class="eyebrow">Roblox item bozori · O'zbekiston</p>
+      <h1>Brainrotingni <span class="hl">sot</span>,<br>xohlaganingga <span class="hl-alt">trade</span> qil.</h1>
+      <p class="hero-sub">Steal a Brainrot, Grow a Garden, MM2, Blox Fruit va boshqa o'yinlardagi itemlar — bittasi ham botdan o'tmasdan bu yerga tushmaydi. Har bir e'lon shu yerda, jonli.</p>
+      <div class="hero-stats" id="hero-stats">
+        <div class="stat"><span class="stat-num" id="stat-total">0</span><span class="stat-label">jami e'lon</span></div>
+        <div class="stat"><span class="stat-num" id="stat-trade">0</span><span class="stat-label">trade</span></div>
+        <div class="stat"><span class="stat-num" id="stat-sale">0</span><span class="stat-label">sotuv</span></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="ticker-wrap" aria-hidden="true">
+    <div class="ticker" id="ticker">
+      <div class="ticker-track" id="ticker-track"></div>
+    </div>
+  </div>
+
+  <section class="controls-section">
+    <div class="wrap">
+      <div class="controls">
+        <div class="search-box">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="M20 20L16.65 16.65" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          <input type="text" id="search-input" placeholder="Item nomi, o'yin yoki @username bo'yicha qidir...">
+        </div>
+        <select id="sort-select" class="select">
+          <option value="new">Eng yangi</option>
+          <option value="price_desc">Narx: yuqoridan</option>
+          <option value="price_asc">Narx: pastdan</option>
+        </select>
+      </div>
+      <div class="game-pills" id="game-pills">
+        <button class="pill is-active" data-game="all">Barcha o'yinlar</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="listings-section">
+    <div class="wrap">
+      <div class="listings-meta">
+        <span id="results-count">Yuklanmoqda...</span>
+        <span id="updated-at" class="updated-at"></span>
+      </div>
+      <div class="grid" id="grid"></div>
+      <div class="empty-state" id="empty-state" hidden>
+        <div class="empty-icon">🕳️</div>
+        <h3>Bu yerda hali hech narsa yo'q</h3>
+        <p>Filtrni tozalab qayta urinib ko'ring yoki botga o'tib birinchi bo'lib e'lon joylang.</p>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="wrap footer-inner">
+    <p>© <span id="year"></span> Brainrot Bozor · Barcha e'lonlar Telegram bot orqali joylanadi</p>
+    <a href="#" id="channel-link" target="_blank" rel="noopener">Kanalga o'tish →</a>
+  </div>
+</footer>
+
+<div class="modal-backdrop" id="modal-backdrop">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <button class="modal-close" id="modal-close" aria-label="Yopish">✕</button>
+    <div id="modal-content"></div>
+  </div>
+</div>
+
+<script>
+// ============ CONFIG ============
+// Botingiz va kanalingiz manzillarini shu yerda o'zgartiring:
+const CHANNEL_URL = "https://t.me/trade_chanel_uz";
+const FALLBACK_BOT_URL = "https://t.me/"; // agar listings.json ichida bot_username bo'lmasa shu ishlatiladi
+
+const GAME_ORDER = ["steal_brainrot", "grow_garden", "escape_tsunami", "mm2", "blox_fruit", "escape_keyboard"];
+const GAME_ICONS = {
+  steal_brainrot: "🧠",
+  grow_garden: "🌱",
+  escape_tsunami: "🌊",
+  mm2: "🔪",
+  blox_fruit: "🍎",
+  escape_keyboard: "⌨️",
+};
+
+// ============ STATE ============
+let ALL_LISTINGS = [];
+let state = { type: "all", game: "all", query: "", sort: "new" };
+
+// ============ INIT ============
+document.getElementById("year").textContent = new Date().getFullYear();
+document.getElementById("channel-link").href = CHANNEL_URL;
+
+fetch("data/listings.json?_=" + Date.now())
+  .then((r) => {
+    if (!r.ok) throw new Error("no data yet");
+    return r.json();
+  })
+  .then((data) => {
+    ALL_LISTINGS = data.listings || [];
+    const botUsername = data.bot_username;
+    document.getElementById("bot-link").href = botUsername ? `https://t.me/${botUsername}` : FALLBACK_BOT_URL;
+    if (data.generated_at) {
+      const d = new Date(data.generated_at);
+      document.getElementById("updated-at").textContent =
+        "yangilangan: " + d.toLocaleString("uz-UZ", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" });
+    }
+    buildGamePills();
+    buildTicker();
+    render();
+  })
+  .catch(() => {
+    document.getElementById("results-count").textContent = "Ma'lumotlar hali tayyor emas — birozdan so'ng qayta tekshiring.";
+    document.getElementById("empty-state").hidden = false;
+  });
+
+// ============ GAME PILLS ============
+function buildGamePills() {
+  const wrap = document.getElementById("game-pills");
+  const gamesPresent = [...new Set(ALL_LISTINGS.map((l) => l.game).filter(Boolean))];
+  const ordered = GAME_ORDER.filter((g) => gamesPresent.includes(g)).concat(
+    gamesPresent.filter((g) => !GAME_ORDER.includes(g))
+  );
+  ordered.forEach((game) => {
+    const label = ALL_LISTINGS.find((l) => l.game === game)?.game_label || game;
+    const btn = document.createElement("button");
+    btn.className = "pill";
+    btn.dataset.game = game;
+    btn.textContent = label;
+    btn.addEventListener("click", () => {
+      state.game = game;
+      document.querySelectorAll(".pill").forEach((p) => p.classList.remove("is-active"));
+      btn.classList.add("is-active");
+      render();
+    });
+    wrap.appendChild(btn);
+  });
+  document.querySelector('.pill[data-game="all"]').addEventListener("click", (e) => {
+    state.game = "all";
+    document.querySelectorAll(".pill").forEach((p) => p.classList.remove("is-active"));
+    e.target.classList.add("is-active");
+    render();
+  });
+}
+
+// ============ TICKER ============
+function buildTicker() {
+  const track = document.getElementById("ticker-track");
+  const items = ALL_LISTINGS.slice(0, 16);
+  if (!items.length) {
+    document.querySelector(".ticker-wrap").style.display = "none";
+    return;
+  }
+  const makeSet = () =>
+    items
+      .map((l) => {
+        const priceStr = l.type === "sale" && l.price ? `<span class="tprice">${fmtPrice(l.price)} ${escapeHtml(l.currency || "")}</span>` : `<span class="tprice">TRADE</span>`;
+        return `<div class="ticker-item"><b>${escapeHtml(l.name || "Nomsiz item")}</b>${priceStr}</div>`;
+      })
+      .join("");
+  // ikki marta takrorlanadi — uzluksiz scroll effekti uchun
+  track.innerHTML = makeSet() + makeSet();
+}
+
+// ============ NAV TYPE FILTER ============
+document.querySelectorAll(".nav-link").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    state.type = btn.dataset.typeFilter;
+    document.querySelectorAll(".nav-link").forEach((b) => b.classList.remove("is-active"));
+    btn.classList.add("is-active");
+    render();
+  });
+});
+
+// ============ SEARCH / SORT ============
+let searchDebounce;
+document.getElementById("search-input").addEventListener("input", (e) => {
+  clearTimeout(searchDebounce);
+  const val = e.target.value;
+  searchDebounce = setTimeout(() => {
+    state.query = val.trim().toLowerCase();
+    render();
+  }, 150);
+});
+document.getElementById("sort-select").addEventListener("change", (e) => {
+  state.sort = e.target.value;
+  render();
+});
+
+// ============ RENDER ============
+function render() {
+  let list = ALL_LISTINGS.filter((l) => {
+    if (state.type !== "all" && l.type !== state.type) return false;
+    if (state.game !== "all" && l.game !== state.game) return false;
+    if (state.query) {
+      const hay = `${l.name} ${l.bio} ${l.username} ${l.roblox_nick} ${l.game_label}`.toLowerCase();
+      if (!hay.includes(state.query)) return false;
+    }
+    return true;
+  });
+
+  if (state.sort === "price_desc") list = list.slice().sort((a, b) => (b.price || 0) - (a.price || 0));
+  if (state.sort === "price_asc") list = list.slice().sort((a, b) => (a.price || 0) - (b.price || 0));
+
+  const grid = document.getElementById("grid");
+  const emptyState = document.getElementById("empty-state");
+  const countEl = document.getElementById("results-count");
+
+  countEl.textContent = `${list.length} ta e'lon topildi`;
+
+  if (!list.length) {
+    grid.innerHTML = "";
+    emptyState.hidden = false;
+    updateHeroStats();
+    return;
+  }
+  emptyState.hidden = true;
+  grid.innerHTML = list.map(cardHtml).join("");
+
+  grid.querySelectorAll(".card").forEach((card, i) => {
+    card.addEventListener("click", () => openModal(list[i]));
+  });
+
+  updateHeroStats();
+}
+
+function updateHeroStats() {
+  document.getElementById("stat-total").textContent = ALL_LISTINGS.length;
+  document.getElementById("stat-trade").textContent = ALL_LISTINGS.filter((l) => l.type === "trade").length;
+  document.getElementById("stat-sale").textContent = ALL_LISTINGS.filter((l) => l.type === "sale").length;
+}
+
+function rarityClass(item) {
+  if (item.type !== "sale" || !item.price) return "";
+  const p = Number(item.price) || 0;
+  if (p >= 500000) return "rarity-mythic";
+  if (p >= 150000) return "rarity-legendary";
+  if (p >= 50000) return "rarity-epic";
+  if (p >= 10000) return "rarity-rare";
+  return "";
+}
+
+function cardHtml(item) {
+  const icon = GAME_ICONS[item.game] || "🎮";
+  const media = item.photo
+    ? `<img src="${item.photo}" alt="${escapeHtml(item.name)}" loading="lazy">`
+    : `<span class="placeholder-icon">${icon}</span>`;
+  const badge = item.type === "sale" ? `<span class="badge badge-sale">Sotuv</span>` : `<span class="badge badge-trade">Trade</span>`;
+  const priceLine = item.type === "sale" && item.price ? `<div class="card-price">${fmtPrice(item.price)} ${escapeHtml(item.currency || "")}</div>` : "";
+
+  return `
+    <article class="card ${rarityClass(item)}">
+      <div class="card-media">${media}${badge}</div>
+      <div class="card-body">
+        <span class="card-game">${icon} ${escapeHtml(item.game_label || "")}</span>
+        <h3 class="card-name">${escapeHtml(item.name || "Nomsiz item")}</h3>
+        <p class="card-bio">${escapeHtml(item.bio || "Tavsif yo'q")}</p>
+        ${priceLine}
+        <div class="card-footer">
+          <span class="card-user">@${escapeHtml(item.username || "user")}</span>
+          <button type="button" class="card-cta">Ko'rish</button>
+        </div>
+      </div>
+    </article>`;
+}
+
+// ============ MODAL ============
+const backdrop = document.getElementById("modal-backdrop");
+document.getElementById("modal-close").addEventListener("click", closeModal);
+backdrop.addEventListener("click", (e) => {
+  if (e.target === backdrop) closeModal();
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") closeModal();
+});
+
+function openModal(item) {
+  const icon = GAME_ICONS[item.game] || "🎮";
+  const media = item.photo ? `<img src="${item.photo}" alt="${escapeHtml(item.name)}">` : "";
+  const priceLine = item.type === "sale" && item.price ? `<div class="m-price">${fmtPrice(item.price)} ${escapeHtml(item.currency || "")}</div>` : "";
+  const contactUrl = item.username ? `https://t.me/${item.username}` : CHANNEL_URL;
+
+  document.getElementById("modal-content").innerHTML = `
+    ${media}
+    <div class="m-game">${icon} ${escapeHtml(item.game_label || "")} · ${item.type === "sale" ? "SOTUV" : "TRADE"}</div>
+    <h3>${escapeHtml(item.name || "Nomsiz item")}</h3>
+    <p class="m-bio">${escapeHtml(item.bio || "Tavsif yo'q")}</p>
+    ${priceLine}
+    <div class="m-contact">
+      <span class="card-user">@${escapeHtml(item.username || "user")}${item.roblox_nick ? " · Roblox: " + escapeHtml(item.roblox_nick) : ""}</span>
+      <a class="btn btn-bot" href="${contactUrl}" target="_blank" rel="noopener">Murojaat qilish →</a>
+    </div>
+  `;
+  backdrop.classList.add("is-open");
+}
+function closeModal() {
+  backdrop.classList.remove("is-open");
+}
+
+// ============ HELPERS ============
+function fmtPrice(n) {
+  const num = Number(n);
+  if (Number.isNaN(num)) return n;
+  return num.toLocaleString("uz-UZ");
+}
+function escapeHtml(str) {
+  if (str === undefined || str === null) return "";
+  return String(str).replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
+}
+</script>
+</body>
+</html>
