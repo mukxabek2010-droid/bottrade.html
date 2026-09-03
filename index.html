@@ -3,9 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Web Craft 3D</title>
+    <title>Web Craft 3D - Mobile</title>
     <style>
-        body { margin: 0; overflow: hidden; font-family: sans-serif; user-select: none; }
+        body { margin: 0; overflow: hidden; font-family: sans-serif; user-select: none; touch-action: none; }
+        
         #crosshair {
             position: absolute; top: 50%; left: 50%;
             width: 10px; height: 10px;
@@ -13,52 +14,67 @@
             color: white; font-size: 24px; font-weight: bold;
             pointer-events: none; z-index: 10;
         }
-        #instructions {
-            position: absolute; top: 20px; left: 20px;
-            color: white; background: rgba(0,0,0,0.6);
-            padding: 12px; border-radius: 8px; z-index: 10;
+
+        /* Ekran ustidagi kontrollerlar */
+        #joystick-zone {
+            position: absolute; bottom: 30px; left: 30px;
+            width: 120px; height: 120px; z-index: 20;
         }
+
+        .action-btns {
+            position: absolute; bottom: 30px; right: 30px;
+            display: flex; gap: 15px; z-index: 20;
+        }
+
+        .btn {
+            width: 65px; height: 65px;
+            border-radius: 50%; border: none;
+            color: white; font-weight: bold; font-size: 14px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            active { transform: scale(0.95); }
+        }
+
+        #btn-destroy { background: #e74c3c; } /* Blokni buzish */
+        #btn-build { background: #2ecc71; }   /* Blok qo'yish */
     </style>
-    <!-- Three.js kutubxonalari -->
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/PointerLockControls.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/nipplejs/0.9.0/nipplejs.min.js"></script>
 </head>
 <body>
 
     <div id="crosshair">+</div>
-    <div id="instructions">
-        <b>Boshqaruv:</b><br>
-        • Sichqonchani bosing — O'yinga kirish<br>
-        • W, A, S, D — Yurish<br>
-        • Chap tugma — Blokni buza olish<br>
-        • O'ng tugma — Yangi blok qo'yish
+
+    <div id="joystick-zone"></div>
+    <div class="action-btns">
+        <button id="btn-destroy" class="btn">BUZISH</button>
+        <button id="btn-build" class="btn">QO'YISH</button>
     </div>
 
     <script>
-        // 1. Sahnani sozlash
+        // 1. Scene & Camera Setup
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x87ceeb); // Osmon rangi
+        scene.background = new THREE.Color(0x87ceeb);
 
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
 
-        // 2. Yorug'lik
+        // Light
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
         scene.add(ambientLight);
         const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
         dirLight.position.set(20, 40, 20);
         scene.add(dirLight);
 
-        // 3. Blok teksturalari va obyektlar
+        // 2. Bloklar yaratish
         const blocks = [];
         const geometry = new THREE.BoxGeometry(1, 1, 1);
-        const material = new THREE.MeshLambertMaterial({ color: 0x4CAF50 }); // Yashil yer rangi
+        const material = new THREE.MeshLambertMaterial({ color: 0x4CAF50 });
 
-        // 10x10 blokli yer maydonini avtomatik yaratish
-        for (let x = -5; x < 5; x++) {
-            for (let z = -5; z < 5; z++) {
+        for (let x = -6; x < 6; x++) {
+            for (let z = -6; z < 6; z++) {
                 const cube = new THREE.Mesh(geometry, material);
                 cube.position.set(x, 0, z);
                 scene.add(cube);
@@ -66,76 +82,102 @@
             }
         }
 
-        // 4. Boshqaruv (Pointer Lock)
-        const controls = new THREE.PointerLockControls(camera, document.body);
-        document.body.addEventListener('click', () => controls.lock());
-
         camera.position.set(0, 2, 5);
 
-        const moveState = { forward: false, backward: false, left: false, right: false };
-        document.addEventListener('keydown', (e) => {
-            if (e.code === 'KeyW') moveState.forward = true;
-            if (e.code === 'KeyS') moveState.backward = true;
-            if (e.code === 'KeyA') moveState.left = true;
-            if (e.code === 'KeyD') moveState.right = true;
-        });
-        document.addEventListener('keyup', (e) => {
-            if (e.code === 'KeyW') moveState.forward = false;
-            if (e.code === 'KeyS') moveState.backward = false;
-            if (e.code === 'KeyA') moveState.left = false;
-            if (e.code === 'KeyD') moveState.right = false;
+        // 3. Mobil Joystick Boshqaruvi
+        let moveVector = { x: 0, y: 0 };
+        const manager = nipplejs.create({
+            zone: document.getElementById('joystick-zone'),
+            mode: 'static',
+            position: { left: '60px', bottom: '60px' },
+            color: 'white'
         });
 
-        // 5. Blok qo'yish va buzish (Raycasting)
+        manager.on('move', (evt, data) => {
+            if (data.vector) {
+                moveVector.x = data.vector.x;
+                moveVector.y = data.vector.y;
+            }
+        });
+
+        manager.on('end', () => {
+            moveVector = { x: 0, y: 0 };
+        });
+
+        // 4. Ekranni surish orqali Kamerani burish (Touch Camera Look)
+        let touchStartX = 0, touchStartY = 0;
+        let lon = -90, lat = 0;
+
+        window.addEventListener('touchstart', (e) => {
+            // Faqat o'ng tomonga teginganda kamerani burish (joystik va knopkalarga tegmaslik)
+            if (e.touches[0].clientX > window.innerWidth / 2) {
+                touchStartX = e.touches[0].clientX;
+                touchStartY = e.touches[0].clientY;
+            }
+        });
+
+        window.addEventListener('touchmove', (e) => {
+            for (let touch of e.touches) {
+                if (touch.clientX > window.innerWidth / 3) {
+                    const deltaX = touch.clientX - touchStartX;
+                    const deltaY = touch.clientY - touchStartY;
+
+                    lon += deltaX * 0.2;
+                    lat = Math.max(-85, Math.min(85, lat - deltaY * 0.2));
+
+                    touchStartX = touch.clientX;
+                    touchStartY = touch.clientY;
+                }
+            }
+        });
+
+        // 5. Blok Qo'yish va Buzish Tugmalari (Raycasting)
         const raycaster = new THREE.Raycaster();
-        const mouse = new THREE.Vector2(0, 0);
 
-        window.addEventListener('mousedown', (e) => {
-            if (!controls.isLocked) return;
-
-            raycaster.setFromCamera(mouse, camera);
+        function handleBlockAction(isBuild) {
+            raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
             const intersects = raycaster.intersectObjects(blocks);
 
             if (intersects.length > 0) {
                 const intersect = intersects[0];
-
-                if (e.button === 0) { // Chap tugma - Buzish
+                if (!isBuild) {
+                    // Buzish
                     scene.remove(intersect.object);
                     blocks.splice(blocks.indexOf(intersect.object), 1);
-                } else if (e.button === 2) { // O'ng tugma - Yangi blok qo'yish
+                } else {
+                    // Yangi blok qo'yish
                     const newCube = new THREE.Mesh(geometry, material);
                     newCube.position.copy(intersect.point).add(intersect.face.normal).floor().addScalar(0.5);
                     scene.add(newCube);
                     blocks.push(newCube);
                 }
             }
+        }
+
+        document.getElementById('btn-destroy').addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            handleBlockAction(false);
         });
 
-        // Kontekst menyuni o'chirish (o'ng tugma bosilganda sayt menyusi chiqmasligi uchun)
-        window.addEventListener('contextmenu', e => e.preventDefault());
+        document.getElementById('btn-build').addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            handleBlockAction(true);
+        });
 
-        // 6. Animatsiya va yangilanish
-        const speed = 0.1;
+        // 6. Animatsiya & Harakat Mantiqi
+        const speed = 0.08;
         function animate() {
             requestAnimationFrame(animate);
 
-            if (controls.isLocked) {
-                if (moveState.forward) controls.moveForward(speed);
-                if (moveState.backward) controls.moveForward(-speed);
-                if (moveState.left) controls.moveRight(-speed);
-                if (moveState.right) controls.moveRight(speed);
-            }
+            // Kamerani burchagini hisoblash
+            const phi = THREE.MathUtils.degToRad(90 - lat);
+            const theta = THREE.MathUtils.degToRad(lon);
 
-            renderer.render(scene, camera);
-        }
-        animate();
+            const target = new THREE.Vector3(
+                camera.position.x + Math.sin(phi) * Math.cos(theta),
+                camera.position.y + Math.cos(phi),
+                camera.position.z + Math.sin(phi) * Math.sin(theta)
+            );
+            camera.lookAt(target);
 
-        // Oyna hajmi o'zgarganda ekranni moslash
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        });
-    </script>
-</body>
-</html>
+            // Joystik orqali harakatlan
