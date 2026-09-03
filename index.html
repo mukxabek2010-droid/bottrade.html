@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Roblox Style PvP Arena</title>
+    <title>Roblox Style PvP Arena V2</title>
     <style>
         * { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
         body { margin: 0; overflow: hidden; font-family: 'Arial Black', sans-serif; touch-action: none; background: #87ceeb; }
@@ -34,6 +34,7 @@
             background: #eab308; border: 4px solid #fff; color: #000;
             font-weight: bold; font-size: 18px; z-index: 20;
             display: none; box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            cursor: pointer;
         }
     </style>
 
@@ -74,7 +75,6 @@
         floor.position.y = -0.5;
         scene.add(floor);
 
-        // Safe Zone (Yashil Baza)
         const myBase = new THREE.Mesh(
             new THREE.BoxGeometry(12, 0.2, 12),
             new THREE.MeshLambertMaterial({ color: 0x22c55e })
@@ -118,7 +118,7 @@
         playerGroup.position.set(0, 0, 15);
         scene.add(playerGroup);
 
-        // Qilich Modeli (Player qo'liga)
+        // Player Qilichi
         const playerSword = new THREE.Mesh(
             new THREE.BoxGeometry(0.1, 1.5, 0.2),
             new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.8 })
@@ -128,7 +128,7 @@
         playerSword.visible = false;
         rightArm.add(playerSword);
 
-        // 4. Bazadagi Yerdagi Qilich (Pick up sword)
+        // Ground Sword
         const groundSword = new THREE.Mesh(
             new THREE.BoxGeometry(0.2, 2.0, 0.3),
             new THREE.MeshStandardMaterial({ color: 0xeab308, metalness: 0.9 })
@@ -137,7 +137,7 @@
         groundSword.rotation.z = Math.PI / 4;
         scene.add(groundSword);
 
-        // 5. PvP Bot Enemy
+        // PvP Bot
         const botGroup = new THREE.Group();
         const botTorso = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.0, 0.4), new THREE.MeshLambertMaterial({ color: 0xd97706 }));
         botTorso.position.y = 1.3;
@@ -149,7 +149,18 @@
         botGroup.position.set(0, 0, -5);
         scene.add(botGroup);
 
-        // 6. Controls
+        // 4. WASD va Klaviatura Boshqaruvi Fixed
+        const keys = { KeyW: false, KeyS: false, KeyA: false, KeyD: false };
+        
+        window.addEventListener('keydown', (e) => {
+            if (keys.hasOwnProperty(e.code)) keys[e.code] = true;
+        });
+        
+        window.addEventListener('keyup', (e) => {
+            if (keys.hasOwnProperty(e.code)) keys[e.code] = false;
+        });
+
+        // 5. Joystick Control
         let moveAngle = null;
         let moveSpeed = 0;
 
@@ -168,7 +179,7 @@
         });
         manager.on('end', () => { moveSpeed = 0; moveAngle = null; });
 
-        // Camera Drag Controls
+        // 6. Camera Drag & Player Rotation Sync
         let isDragging = false;
         let previousMousePosition = { x: 0, y: 0 };
         let cameraAngleX = 0;
@@ -178,7 +189,7 @@
         function onPointerDown(e) {
             if (e.clientX < 180 && e.clientY > window.innerHeight - 180) return;
             isDragging = true;
-            previousMousePosition = { x: e.clientX || e.touches[0].clientX, y: e.clientY || e.touches[0].clientY };
+            previousMousePosition = { x: e.clientX || (e.touches && e.touches[0].clientX), y: e.clientY || (e.touches && e.touches[0].clientY) };
         }
 
         function onPointerMove(e) {
@@ -193,6 +204,9 @@
             cameraAngleX -= deltaX * 0.008;
             cameraAngleY += deltaY * 0.005;
             cameraAngleY = Math.max(0.1, Math.min(Math.PI / 2.5, cameraAngleY));
+
+            // EKRAN BURILGANDA ODAM HAM SHU TOMONGA BURILADI:
+            playerGroup.rotation.y = cameraAngleX + Math.PI;
 
             previousMousePosition = { x: clientX, y: clientY };
         }
@@ -210,25 +224,28 @@
         const attackBtn = document.getElementById('attack-btn');
         let isAttacking = false;
 
-        attackBtn.addEventListener('click', () => {
-            if (isAttacking) return;
+        attackBtn.addEventListener('click', doAttack);
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') doAttack();
+        });
+
+        function doAttack() {
+            if (isAttacking || !hasSword) return;
             isAttacking = true;
             
-            // Qilich siltash animatsiyasi
             rightArm.rotation.x = -Math.PI / 2;
             setTimeout(() => {
                 rightArm.rotation.x = 0;
                 isAttacking = false;
             }, 300);
 
-            // Botga yaqin bo'lsa ziyon yetkazish
-            if (playerGroup.position.distanceTo(botGroup.position) < 3.0) {
+            if (playerGroup.position.distanceTo(botGroup.position) < 3.5) {
                 score += 100;
                 document.getElementById('score').innerText = score;
                 botGroup.position.x = (Math.random() - 0.5) * 20;
                 botGroup.position.z = (Math.random() - 0.5) * 20;
             }
-        });
+        }
 
         // 7. Game Loop
         let animTime = 0;
@@ -236,26 +253,46 @@
         function animate() {
             requestAnimationFrame(animate);
 
-            let vx = 0, vz = 0;
+            let moveX = 0;
+            let moveZ = 0;
 
+            // WASD boyicha kamera burchagiga mos nisbiy harakat
+            if (keys.KeyW) moveZ -= 0.18;
+            if (keys.KeyS) moveZ += 0.18;
+            if (keys.KeyA) moveX -= 0.18;
+            if (keys.KeyD) moveX += 0.18;
+
+            // Joystik harakati
             if (moveAngle !== null && moveSpeed > 0) {
-                // Kamera yo'nalishiga qarab to'g'ri hisoblash
                 const moveDir = moveAngle + cameraAngleX + Math.PI / 2;
-                vx = Math.cos(moveDir) * moveSpeed;
-                vz = -Math.sin(moveDir) * moveSpeed;
+                playerGroup.position.x += Math.cos(moveDir) * moveSpeed;
+                playerGroup.position.z -= Math.sin(moveDir) * moveSpeed;
+                playerGroup.rotation.y = Math.atan2(Math.cos(moveDir), -Math.sin(moveDir));
             }
 
-            if (vx !== 0 || vz !== 0) {
-                playerGroup.position.x += vx;
-                playerGroup.position.z += vz;
+            // Keyboard harakatini qo'llash
+            if (moveX !== 0 || moveZ !== 0) {
+                const forwardX = Math.sin(cameraAngleX);
+                const forwardZ = Math.cos(cameraAngleX);
+                const rightX = Math.cos(cameraAngleX);
+                const rightZ = -Math.sin(cameraAngleX);
 
-                playerGroup.position.x = Math.max(-20, Math.min(20, playerGroup.position.x));
-                playerGroup.position.z = Math.max(-20, Math.min(20, playerGroup.position.z));
+                playerGroup.position.x += forwardX * moveZ + rightX * moveX;
+                playerGroup.position.z += forwardZ * moveZ + rightZ * moveX;
 
-                // PERSONAJNI ANIQ BURISH FIXI:
-                playerGroup.rotation.y = Math.atan2(vx, vz);
+                // Harakat vaqtida yurgan tomonga qarash
+                playerGroup.rotation.y = Math.atan2(
+                    forwardX * moveZ + rightX * moveX,
+                    forwardZ * moveZ + rightZ * moveX
+                );
+            }
 
-                // Yurish animatsiyasi
+            // Chegaralar
+            playerGroup.position.x = Math.max(-20, Math.min(20, playerGroup.position.x));
+            playerGroup.position.z = Math.max(-20, Math.min(20, playerGroup.position.z));
+
+            // Yurish Animatsiyasi
+            if (moveX !== 0 || moveZ !== 0 || (moveAngle !== null && moveSpeed > 0)) {
                 animTime += 0.25;
                 leftLeg.rotation.x = Math.sin(animTime) * 0.6;
                 rightLeg.rotation.x = -Math.sin(animTime) * 0.6;
@@ -268,13 +305,13 @@
                 if (!isAttacking) rightArm.rotation.x = 0;
             }
 
-            // Camera positioning
+            // Camera follow
             camera.position.x = playerGroup.position.x + cameraDistance * Math.sin(cameraAngleX) * Math.cos(cameraAngleY);
             camera.position.y = playerGroup.position.y + cameraDistance * Math.sin(cameraAngleY) + 1;
             camera.position.z = playerGroup.position.z + cameraDistance * Math.cos(cameraAngleX) * Math.cos(cameraAngleY);
             camera.lookAt(playerGroup.position.x, playerGroup.position.y + 1.5, playerGroup.position.z);
 
-            // Qilichni olish mantiqi
+            // Sword Pickup Check
             if (!hasSword && playerGroup.position.distanceTo(groundSword.position) < 2.0) {
                 hasSword = true;
                 groundSword.visible = false;
@@ -283,10 +320,7 @@
                 document.getElementById('status-msg').style.display = 'block';
             }
 
-            // Yerdagi qilichni aylantirib turish
-            if (groundSword.visible) {
-                groundSword.rotation.y += 0.03;
-            }
+            if (groundSword.visible) groundSword.rotation.y += 0.03;
 
             renderer.render(scene, camera);
         }
