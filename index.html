@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Steal an Egg - Roblox Style V2</title>
+    <title>Steal an Egg - Roblox Style V3</title>
     <style>
         * { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
         body { margin: 0; overflow: hidden; font-family: 'Arial Black', sans-serif; touch-action: none; background: #87ceeb; }
         
-        /* Pastki chap burchakdagi Roblox uslubidagi Yashil Pul UI */
+        /* Roblox uslubidagi Yashil Dollar UI */
         #money-ui {
             position: absolute; bottom: 25px; left: 25px;
             background: linear-gradient(135deg, #15803d, #22c55e);
@@ -24,8 +24,9 @@
             font-weight: bold; font-size: 16px; border: 2px solid #fff; display: none; z-index: 10;
         }
 
+        /* Joystik chap tomonda */
         #joystick-zone {
-            position: absolute; bottom: 30px; right: 30px;
+            position: absolute; bottom: 30px; left: 30px;
             width: 120px; height: 120px; z-index: 20;
         }
     </style>
@@ -35,7 +36,6 @@
 </head>
 <body>
 
-    <!-- UI: Yashil Dollar va Status -->
     <div id="money-ui">💵 $<span id="score">0</span></div>
     <div id="status-msg">TUXUM O'G'IRLANDI! BAZANGGA CHOP!</div>
     <div id="joystick-zone"></div>
@@ -74,25 +74,21 @@
         myBase.position.set(0, 0.1, 14);
         scene.add(myBase);
 
-        // 3. Roblox R6 Personaj Yaratish (Bosh, Tana, Qo'llar, Oyoqlar, Soch)
+        // 3. Roblox R6 Personaj Yaratish
         const playerGroup = new THREE.Group();
         
-        // Tana (Torso)
         const torso = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.0, 0.4), new THREE.MeshLambertMaterial({ color: 0x2563eb }));
         torso.position.y = 1.3;
         playerGroup.add(torso);
 
-        // Bosh (Head)
         const head = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.6, 0.6), new THREE.MeshLambertMaterial({ color: 0xfacc15 }));
         head.position.y = 2.1;
         playerGroup.add(head);
 
-        // Soch (Hair)
         const hair = new THREE.Mesh(new THREE.BoxGeometry(0.68, 0.25, 0.68), new THREE.MeshLambertMaterial({ color: 0x451a03 }));
         hair.position.y = 2.45;
         playerGroup.add(hair);
 
-        // Qo'llar (Left & Right Arms)
         const armMat = new THREE.MeshLambertMaterial({ color: 0x2563eb });
         const leftArm = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.9, 0.35), armMat);
         leftArm.position.set(-0.6, 1.25, 0);
@@ -102,7 +98,6 @@
         rightArm.position.set(0.6, 1.25, 0);
         playerGroup.add(rightArm);
 
-        // Oyoqlar (Left & Right Legs)
         const legMat = new THREE.MeshLambertMaterial({ color: 0x1e293b });
         const leftLeg = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.9, 0.38), legMat);
         leftLeg.position.set(-0.22, 0.45, 0);
@@ -136,7 +131,7 @@
         const manager = nipplejs.create({
             zone: document.getElementById('joystick-zone'),
             mode: 'static',
-            position: { right: '70px', bottom: '70px' },
+            position: { left: '70px', bottom: '70px' },
             color: 'white', size: 110
         });
 
@@ -148,27 +143,75 @@
         });
         manager.on('end', () => { moveSpeed = 0; moveAngle = null; });
 
-        // Keyboard support (PC)
+        // 6. Sichqoncha / Teagish Bilan Kamerani Burish (Roblox Style Camera)
+        let isDragging = false;
+        let previousMousePosition = { x: 0, y: 0 };
+        let cameraAngleX = 0; // Gorizontal burilish
+        let cameraAngleY = 0.4; // Vertikal burilish
+        const cameraDistance = 12;
+
+        function onPointerDown(e) {
+            // Joystik zonasidan tashqarida bosilganda kamerani burish
+            if (e.clientX < 180 && e.clientY > window.innerHeight - 180) return;
+            isDragging = true;
+            previousMousePosition = { x: e.clientX || e.touches[0].clientX, y: e.clientY || e.touches[0].clientY };
+        }
+
+        function onPointerMove(e) {
+            if (!isDragging) return;
+
+            const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+            const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+
+            if (!clientX || !clientY) return;
+
+            const deltaX = clientX - previousMousePosition.x;
+            const deltaY = clientY - previousMousePosition.y;
+
+            cameraAngleX -= deltaX * 0.008; // Chap-o'ngga burish
+            cameraAngleY += deltaY * 0.005; // Tepa-pastga burish
+
+            // Kamera juda pastga yoki tepaga ketib qolmasligi uchun chegara
+            cameraAngleY = Math.max(0.1, Math.min(Math.PI / 2.5, cameraAngleY));
+
+            previousMousePosition = { x: clientX, y: clientY };
+        }
+
+        function onPointerUp() { isDragging = false; }
+
+        window.addEventListener('mousedown', onPointerDown);
+        window.addEventListener('mousemove', onPointerMove);
+        window.addEventListener('mouseup', onPointerUp);
+
+        window.addEventListener('touchstart', onPointerDown);
+        window.addEventListener('touchmove', onPointerMove);
+        window.addEventListener('touchend', onPointerUp);
+
+        // Keyboard PC Support
         const keys = {};
         window.addEventListener('keydown', e => keys[e.code] = true);
         window.addEventListener('keyup', e => keys[e.code] = false);
 
-        // 6. Game Loop & Walk Animation
+        // 7. Game Loop & Walk Animation
         let animTime = 0;
 
         function animate() {
             requestAnimationFrame(animate);
 
             let vx = 0, vz = 0;
-            if (moveAngle !== null && moveSpeed > 0) {
-                vx = Math.cos(moveAngle) * moveSpeed;
-                vz = -Math.sin(moveAngle) * moveSpeed;
-            }
 
             if (keys['KeyW'] || keys['ArrowUp']) vz -= 0.18;
             if (keys['KeyS'] || keys['ArrowDown']) vz += 0.18;
             if (keys['KeyA'] || keys['ArrowLeft']) vx -= 0.18;
             if (keys['KeyD'] || keys['ArrowRight']) vx += 0.18;
+
+            // Joystik bo'yicha harakat
+            if (moveAngle !== null && moveSpeed > 0) {
+                // Kamera yo'nalishiga moslashgan holda yurish
+                const moveDir = moveAngle + cameraAngleX + Math.PI / 2;
+                vx = Math.cos(moveDir) * moveSpeed;
+                vz = -Math.sin(moveDir) * moveSpeed;
+            }
 
             if (vx !== 0 || vz !== 0) {
                 playerGroup.position.x += vx;
@@ -192,11 +235,11 @@
                 rightArm.rotation.x = 0;
             }
 
-            // Camera follow
-            camera.position.x = playerGroup.position.x;
-            camera.position.y = playerGroup.position.y + 8;
-            camera.position.z = playerGroup.position.z + 12;
-            camera.lookAt(playerGroup.position.x, playerGroup.position.y + 1, playerGroup.position.z);
+            // Kamerani Roblox'dagidek burilgan burchak bo'yicha hisoblash va ergashishi
+            camera.position.x = playerGroup.position.x + cameraDistance * Math.sin(cameraAngleX) * Math.cos(cameraAngleY);
+            camera.position.y = playerGroup.position.y + cameraDistance * Math.sin(cameraAngleY) + 1;
+            camera.position.z = playerGroup.position.z + cameraDistance * Math.cos(cameraAngleX) * Math.cos(cameraAngleY);
+            camera.lookAt(playerGroup.position.x, playerGroup.position.y + 1.5, playerGroup.position.z);
 
             // Egg Pickup & Base Logic
             if (!carriedEgg) {
