@@ -3,39 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Web Craft 3D - Mobile</title>
+    <title>Steal an Egg 3D</title>
     <style>
         body { margin: 0; overflow: hidden; font-family: sans-serif; user-select: none; touch-action: none; }
         
-        #crosshair {
-            position: absolute; top: 50%; left: 50%;
-            width: 10px; height: 10px;
-            transform: translate(-50%, -50%);
-            color: white; font-size: 24px; font-weight: bold;
-            pointer-events: none; z-index: 10;
+        #ui {
+            position: absolute; top: 20px; left: 20px;
+            color: white; font-size: 20px; font-weight: bold;
+            background: rgba(0,0,0,0.5); padding: 10px 20px; border-radius: 10px;
+            z-index: 10;
         }
 
-        /* Ekran ustidagi kontrollerlar */
         #joystick-zone {
             position: absolute; bottom: 30px; left: 30px;
             width: 120px; height: 120px; z-index: 20;
         }
-
-        .action-btns {
-            position: absolute; bottom: 30px; right: 30px;
-            display: flex; gap: 15px; z-index: 20;
-        }
-
-        .btn {
-            width: 65px; height: 65px;
-            border-radius: 50%; border: none;
-            color: white; font-weight: bold; font-size: 14px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-            active { transform: scale(0.95); }
-        }
-
-        #btn-destroy { background: #e74c3c; } /* Blokni buzish */
-        #btn-build { background: #2ecc71; }   /* Blok qo'yish */
     </style>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -43,48 +25,77 @@
 </head>
 <body>
 
-    <div id="crosshair">+</div>
-
+    <div id="ui">Tangalar: <span id="score">0</span> 🪙</div>
     <div id="joystick-zone"></div>
-    <div class="action-btns">
-        <button id="btn-destroy" class="btn">BUZISH</button>
-        <button id="btn-build" class="btn">QO'YISH</button>
-    </div>
 
     <script>
+        let score = 0;
+        let hasEgg = false;
+        let currentEgg = null;
+
         // 1. Scene & Camera Setup
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x87ceeb);
+        scene.background = new THREE.Color(0xa0e0ff);
 
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
 
-        // Light
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-        scene.add(ambientLight);
-        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-        dirLight.position.set(20, 40, 20);
-        scene.add(dirLight);
+        // Lights
+        const light = new THREE.DirectionalLight(0xffffff, 1);
+        light.position.set(10, 20, 10);
+        scene.add(light);
+        scene.add(new THREE.AmbientLight(0xffffff, 0.5));
 
-        // 2. Bloklar yaratish
-        const blocks = [];
-        const geometry = new THREE.BoxGeometry(1, 1, 1);
-        const material = new THREE.MeshLambertMaterial({ color: 0x4CAF50 });
+        // 2. Map (Maydon)
+        const floorGeo = new THREE.PlaneGeometry(40, 40);
+        const floorMat = new THREE.MeshLambertMaterial({ color: 0x7cfc00 });
+        const floor = new THREE.Mesh(floorGeo, floorMat);
+        floor.rotation.x = -Math.PI / 2;
+        scene.add(floor);
 
-        for (let x = -6; x < 6; x++) {
-            for (let z = -6; z < 6; z++) {
-                const cube = new THREE.Mesh(geometry, material);
-                cube.position.set(x, 0, z);
-                scene.add(cube);
-                blocks.push(cube);
-            }
+        // O'yinchi Bazasi (Yashil Zona)
+        const myBaseGeo = new THREE.BoxGeometry(8, 0.1, 8);
+        const myBaseMat = new THREE.MeshLambertMaterial({ color: 0x2ecc71 });
+        const myBase = new THREE.Mesh(myBaseGeo, myBaseMat);
+        myBase.position.set(0, 0.05, 15);
+        scene.add(myBase);
+
+        // Dushman Bazasi (Qizil Zona)
+        const enemyBaseMat = new THREE.MeshLambertMaterial({ color: 0xe74c3c });
+        const enemyBase = new THREE.Mesh(myBaseGeo, enemyBaseMat);
+        enemyBase.position.set(0, 0.05, -15);
+        scene.add(enemyBase);
+
+        // 3. Player (O'yinchi)
+        const playerGeo = new THREE.CylinderGeometry(0.5, 0.5, 1.5);
+        const playerMat = new THREE.MeshLambertMaterial({ color: 0x3498db });
+        const player = new THREE.Mesh(playerGeo, playerMat);
+        player.position.set(0, 0.75, 15); // O'z bazasida boshlaydi
+        scene.add(player);
+
+        camera.position.set(0, 12, 25);
+        camera.lookAt(player.position);
+
+        // 4. Tuxumlar Yaratish (Eggs)
+        const eggs = [];
+        const eggGeo = new THREE.SphereGeometry(0.5, 16, 16);
+        eggGeo.scale(1, 1.4, 1); // Tuxum shakliga keltirish
+        const eggMat = new THREE.MeshStandardMaterial({ color: 0xf1c40f, metalness: 0.3, roughness: 0.2 });
+
+        function spawnEgg(x, z) {
+            const egg = new THREE.Mesh(eggGeo, eggMat);
+            egg.position.set(x, 0.6, z);
+            scene.add(egg);
+            eggs.push(egg);
         }
 
-        camera.position.set(0, 2, 5);
+        // Markazda va Dushman bazasida tuxum yaratish
+        spawnEgg(0, 0);
+        spawnEgg(0, -15);
 
-        // 3. Mobil Joystick Boshqaruvi
+        // 5. Joystik Boshqaruvi
         let moveVector = { x: 0, y: 0 };
         const manager = nipplejs.create({
             zone: document.getElementById('joystick-zone'),
@@ -99,85 +110,65 @@
                 moveVector.y = data.vector.y;
             }
         });
+        manager.on('end', () => { moveVector = { x: 0, y: 0 }; });
 
-        manager.on('end', () => {
-            moveVector = { x: 0, y: 0 };
-        });
+        // 6. O'yin Mantiqi & Animatsiya
+        const speed = 0.15;
 
-        // 4. Ekranni surish orqali Kamerani burish (Touch Camera Look)
-        let touchStartX = 0, touchStartY = 0;
-        let lon = -90, lat = 0;
-
-        window.addEventListener('touchstart', (e) => {
-            // Faqat o'ng tomonga teginganda kamerani burish (joystik va knopkalarga tegmaslik)
-            if (e.touches[0].clientX > window.innerWidth / 2) {
-                touchStartX = e.touches[0].clientX;
-                touchStartY = e.touches[0].clientY;
-            }
-        });
-
-        window.addEventListener('touchmove', (e) => {
-            for (let touch of e.touches) {
-                if (touch.clientX > window.innerWidth / 3) {
-                    const deltaX = touch.clientX - touchStartX;
-                    const deltaY = touch.clientY - touchStartY;
-
-                    lon += deltaX * 0.2;
-                    lat = Math.max(-85, Math.min(85, lat - deltaY * 0.2));
-
-                    touchStartX = touch.clientX;
-                    touchStartY = touch.clientY;
-                }
-            }
-        });
-
-        // 5. Blok Qo'yish va Buzish Tugmalari (Raycasting)
-        const raycaster = new THREE.Raycaster();
-
-        function handleBlockAction(isBuild) {
-            raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
-            const intersects = raycaster.intersectObjects(blocks);
-
-            if (intersects.length > 0) {
-                const intersect = intersects[0];
-                if (!isBuild) {
-                    // Buzish
-                    scene.remove(intersect.object);
-                    blocks.splice(blocks.indexOf(intersect.object), 1);
-                } else {
-                    // Yangi blok qo'yish
-                    const newCube = new THREE.Mesh(geometry, material);
-                    newCube.position.copy(intersect.point).add(intersect.face.normal).floor().addScalar(0.5);
-                    scene.add(newCube);
-                    blocks.push(newCube);
-                }
-            }
-        }
-
-        document.getElementById('btn-destroy').addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            handleBlockAction(false);
-        });
-
-        document.getElementById('btn-build').addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            handleBlockAction(true);
-        });
-
-        // 6. Animatsiya & Harakat Mantiqi
-        const speed = 0.08;
         function animate() {
             requestAnimationFrame(animate);
 
-            // Kamerani burchagini hisoblash
-            const phi = THREE.MathUtils.degToRad(90 - lat);
-            const theta = THREE.MathUtils.degToRad(lon);
+            // Harakatlanish
+            if (moveVector.x !== 0 || moveVector.y !== 0) {
+                player.position.x += moveVector.x * speed;
+                player.position.z -= moveVector.y * speed;
 
-            const target = new THREE.Vector3(
-                camera.position.x + Math.sin(phi) * Math.cos(theta),
-                camera.position.y + Math.cos(phi),
-                camera.position.z + Math.sin(phi) * Math.sin(theta)
-            );
-            camera.lookAt(target);
+                // Chegaralar
+                player.position.x = Math.max(-18, Math.min(18, player.position.x));
+                player.position.z = Math.max(-18, Math.min(18, player.position.z));
 
-            // Joystik orqali harakatlan
+                // Kamera o'yinchi ortidan yuradi
+                camera.position.x = player.position.x;
+                camera.position.z = player.position.z + 10;
+            }
+
+            // Tuxumni ko'tarib yurish mantiqi
+            if (hasEgg && currentEgg) {
+                currentEgg.position.set(player.position.x, player.position.y + 1.2, player.position.z);
+            } else {
+                // Tuxumni o'g'irlash / Olish
+                eggs.forEach((egg) => {
+                    const dist = player.position.distanceTo(egg.position);
+                    if (dist < 1.2 && !hasEgg) {
+                        hasEgg = true;
+                        currentEgg = egg;
+                    }
+                });
+            }
+
+            // Tuxumni o'z bazasiga topshirish
+            if (hasEgg && player.position.distanceTo(myBase.position) < 3.5) {
+                score += 100;
+                document.getElementById('score').innerText = score;
+
+                scene.remove(currentEgg);
+                eggs.splice(eggs.indexOf(currentEgg), 1);
+                hasEgg = false;
+                currentEgg = null;
+
+                // 3 soniyadan keyin yangi tuxum paydo bo'lishi
+                setTimeout(() => spawnEgg(0, 0), 3000);
+            }
+
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>
