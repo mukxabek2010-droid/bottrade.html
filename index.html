@@ -3,31 +3,29 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Steal an Egg - Roblox Style</title>
+    <title>Steal an Egg - Roblox Style V2</title>
     <style>
         * { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
-        body { margin: 0; overflow: hidden; font-family: 'Arial Rounded MT Bold', sans-serif; touch-action: none; background: #87ceeb; }
+        body { margin: 0; overflow: hidden; font-family: 'Arial Black', sans-serif; touch-action: none; background: #87ceeb; }
         
-        #ui {
-            position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
-            display: flex; gap: 20px; z-index: 10;
-        }
-
-        .stat-box {
-            background: rgba(0, 0, 0, 0.6); color: #fff;
-            padding: 10px 20px; border-radius: 20px; font-size: 20px;
-            border: 3px solid #fff; box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-            display: flex; align-items: center; gap: 8px;
+        /* Pastki chap burchakdagi Roblox uslubidagi Yashil Pul UI */
+        #money-ui {
+            position: absolute; bottom: 25px; left: 25px;
+            background: linear-gradient(135deg, #15803d, #22c55e);
+            color: #ffffff;
+            padding: 12px 24px; border-radius: 16px; font-size: 22px;
+            border: 3px solid #ffffff; box-shadow: 0 6px 15px rgba(0,0,0,0.4);
+            display: flex; align-items: center; gap: 8px; z-index: 10;
         }
 
         #status-msg {
-            position: absolute; top: 80px; left: 50%; transform: translateX(-50%);
-            background: #ffcc00; color: #000; padding: 8px 16px; border-radius: 12px;
-            font-weight: bold; font-size: 16px; display: none; z-index: 10;
+            position: absolute; top: 30px; left: 50%; transform: translateX(-50%);
+            background: #eab308; color: #000; padding: 10px 20px; border-radius: 14px;
+            font-weight: bold; font-size: 16px; border: 2px solid #fff; display: none; z-index: 10;
         }
 
         #joystick-zone {
-            position: absolute; bottom: 40px; left: 40px;
+            position: absolute; bottom: 30px; right: 30px;
             width: 120px; height: 120px; z-index: 20;
         }
     </style>
@@ -37,18 +35,16 @@
 </head>
 <body>
 
-    <div id="ui">
-        <div class="stat-box">🪙 Tangalar: <span id="score">0</span></div>
-    </div>
-    <div id="status-msg">TUXUM O'G'IRLANDI! BAZANGGA OLIB BOR!</div>
-
+    <!-- UI: Yashil Dollar va Status -->
+    <div id="money-ui">💵 $<span id="score">0</span></div>
+    <div id="status-msg">TUXUM O'G'IRLANDI! BAZANGGA CHOP!</div>
     <div id="joystick-zone"></div>
 
     <script>
         let score = 0;
         let carriedEgg = null;
 
-        // 1. Scene & Camera Setup
+        // 1. Scene & Camera
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0xa0e0ff);
 
@@ -58,193 +54,177 @@
         renderer.shadowMap.enabled = true;
         document.body.appendChild(renderer.domElement);
 
-        // Light (Yorug'lik)
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
         scene.add(ambientLight);
-
         const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
         dirLight.position.set(20, 40, 20);
-        dirLight.castShadow = true;
         scene.add(dirLight);
 
-        // 2. Map (Roblox Style Xarita)
+        // 2. Map & Base
         const floorGeo = new THREE.BoxGeometry(40, 1, 40);
-        const floorMat = new THREE.MeshLambertMaterial({ color: 0x55aa55 });
+        const floorMat = new THREE.MeshLambertMaterial({ color: 0x4ade80 });
         const floor = new THREE.Mesh(floorGeo, floorMat);
         floor.position.y = -0.5;
         scene.add(floor);
 
-        // Baza (Sizning Yashil Bazangiz)
-        const myBaseGeo = new THREE.BoxGeometry(10, 0.2, 10);
-        const myBaseMat = new THREE.MeshLambertMaterial({ color: 0x2ecc71 });
-        const myBase = new THREE.Mesh(myBaseGeo, myBaseMat);
+        const myBase = new THREE.Mesh(
+            new THREE.BoxGeometry(10, 0.2, 10),
+            new THREE.MeshLambertMaterial({ color: 0x22c55e })
+        );
         myBase.position.set(0, 0.1, 14);
         scene.add(myBase);
 
-        // Baza Devori (Visual)
-        const baseBorder = new THREE.Mesh(
-            new THREE.BoxGeometry(10.5, 0.5, 0.5),
-            new THREE.MeshLambertMaterial({ color: 0xffffff })
-        );
-        baseBorder.position.set(0, 0.25, 9);
-        scene.add(baseBorder);
-
-        // Dushman Bazasi (Qizil Zona)
-        const enemyBaseMat = new THREE.MeshLambertMaterial({ color: 0xe74c3c });
-        const enemyBase = new THREE.Mesh(myBaseGeo, enemyBaseMat);
-        enemyBase.position.set(0, 0.1, -14);
-        scene.add(enemyBase);
-
-        // 3. Player (Roblox Style Personaj)
+        // 3. Roblox R6 Personaj Yaratish (Bosh, Tana, Qo'llar, Oyoqlar, Soch)
         const playerGroup = new THREE.Group();
         
-        // Tana
-        const bodyGeo = new THREE.BoxGeometry(1, 1.2, 0.6);
-        const bodyMat = new THREE.MeshLambertMaterial({ color: 0x3498db });
-        const body = new THREE.Mesh(bodyGeo, bodyMat);
-        body.position.y = 1.1;
-        playerGroup.add(body);
+        // Tana (Torso)
+        const torso = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.0, 0.4), new THREE.MeshLambertMaterial({ color: 0x2563eb }));
+        torso.position.y = 1.3;
+        playerGroup.add(torso);
 
-        // Bosh
-        const headGeo = new THREE.BoxGeometry(0.7, 0.7, 0.7);
-        const headMat = new THREE.MeshLambertMaterial({ color: 0xf1c40f });
-        const head = new THREE.Mesh(headGeo, headMat);
-        head.position.y = 2.05;
+        // Bosh (Head)
+        const head = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.6, 0.6), new THREE.MeshLambertMaterial({ color: 0xfacc15 }));
+        head.position.y = 2.1;
         playerGroup.add(head);
 
-        playerGroup.position.set(0, 0, 14); // Bazada boshlash
+        // Soch (Hair)
+        const hair = new THREE.Mesh(new THREE.BoxGeometry(0.68, 0.25, 0.68), new THREE.MeshLambertMaterial({ color: 0x451a03 }));
+        hair.position.y = 2.45;
+        playerGroup.add(hair);
+
+        // Qo'llar (Left & Right Arms)
+        const armMat = new THREE.MeshLambertMaterial({ color: 0x2563eb });
+        const leftArm = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.9, 0.35), armMat);
+        leftArm.position.set(-0.6, 1.25, 0);
+        playerGroup.add(leftArm);
+
+        const rightArm = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.9, 0.35), armMat);
+        rightArm.position.set(0.6, 1.25, 0);
+        playerGroup.add(rightArm);
+
+        // Oyoqlar (Left & Right Legs)
+        const legMat = new THREE.MeshLambertMaterial({ color: 0x1e293b });
+        const leftLeg = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.9, 0.38), legMat);
+        leftLeg.position.set(-0.22, 0.45, 0);
+        playerGroup.add(leftLeg);
+
+        const rightLeg = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.9, 0.38), legMat);
+        rightLeg.position.set(0.22, 0.45, 0);
+        playerGroup.add(rightLeg);
+
+        playerGroup.position.set(0, 0, 14);
         scene.add(playerGroup);
 
-        // 4. Tuxumlar Tizimi
+        // 4. Egg System
         const eggs = [];
         const eggGeo = new THREE.SphereGeometry(0.6, 16, 16);
         eggGeo.scale(1, 1.3, 1);
-        const eggMat = new THREE.MeshStandardMaterial({ color: 0xffd700, metalness: 0.5, roughness: 0.1 });
+        const eggMat = new THREE.MeshStandardMaterial({ color: 0xfacc15, metalness: 0.4, roughness: 0.2 });
 
         function createEgg(x, z) {
             const egg = new THREE.Mesh(eggGeo, eggMat);
             egg.position.set(x, 0.8, z);
             scene.add(egg);
             eggs.push(egg);
-            return egg;
         }
+        createEgg(0, 0);
 
-        // Dastlabki tuxumlar
-        createEgg(0, 0);   // Markazda
-        createEgg(0, -14); // Dushman bazasida
-
-        // 5. Joystik va Boshqaruv Mantiqi
+        // 5. Joystick Control
         let moveAngle = null;
         let moveSpeed = 0;
 
         const manager = nipplejs.create({
             zone: document.getElementById('joystick-zone'),
             mode: 'static',
-            position: { left: '70px', bottom: '70px' },
-            color: 'white',
-            size: 110
+            position: { right: '70px', bottom: '70px' },
+            color: 'white', size: 110
         });
 
         manager.on('move', (evt, data) => {
             if (data.angle) {
-                // Joystik burchagini radiana o'tkazish
                 moveAngle = data.angle.radian;
-                moveSpeed = Math.min(data.force, 1) * 0.18; // Ravon tezlik
+                moveSpeed = Math.min(data.force, 1) * 0.18;
             }
         });
+        manager.on('end', () => { moveSpeed = 0; moveAngle = null; });
 
-        manager.on('end', () => {
-            moveSpeed = 0;
-            moveAngle = null;
-        });
-
-        // Keyboard Boshqaruvi (PC uchun ham ishlashi uchun)
+        // Keyboard support (PC)
         const keys = {};
         window.addEventListener('keydown', e => keys[e.code] = true);
         window.addEventListener('keyup', e => keys[e.code] = false);
 
-        // 6. Asosiy O'yin Sikli (Game Loop)
+        // 6. Game Loop & Walk Animation
+        let animTime = 0;
+
         function animate() {
             requestAnimationFrame(animate);
 
-            let vx = 0;
-            let vz = 0;
-
-            // Joystik harakati
+            let vx = 0, vz = 0;
             if (moveAngle !== null && moveSpeed > 0) {
                 vx = Math.cos(moveAngle) * moveSpeed;
                 vz = -Math.sin(moveAngle) * moveSpeed;
             }
 
-            // Klaviatura harakati (W, A, S, D)
             if (keys['KeyW'] || keys['ArrowUp']) vz -= 0.18;
             if (keys['KeyS'] || keys['ArrowDown']) vz += 0.18;
             if (keys['KeyA'] || keys['ArrowLeft']) vx -= 0.18;
             if (keys['KeyD'] || keys['ArrowRight']) vx += 0.18;
 
-            // O'yinchi harakatlanishi va burilishi
             if (vx !== 0 || vz !== 0) {
                 playerGroup.position.x += vx;
                 playerGroup.position.z += vz;
 
-                // Chegaradan chiqib ketmaslik
                 playerGroup.position.x = Math.max(-18, Math.min(18, playerGroup.position.x));
                 playerGroup.position.z = Math.max(-18, Math.min(18, playerGroup.position.z));
 
-                // O meva/o'yinchini harakat yo'nalishiga burish
-                const targetAngle = Math.atan2(vx, vz);
-                playerGroup.rotation.y = targetAngle;
+                playerGroup.rotation.y = Math.atan2(vx, vz);
+
+                // Roblox Yurish Animatsiyasi
+                animTime += 0.25;
+                leftLeg.rotation.x = Math.sin(animTime) * 0.6;
+                rightLeg.rotation.x = -Math.sin(animTime) * 0.6;
+                leftArm.rotation.x = -Math.sin(animTime) * 0.6;
+                rightArm.rotation.x = Math.sin(animTime) * 0.6;
+            } else {
+                leftLeg.rotation.x = 0;
+                rightLeg.rotation.x = 0;
+                leftArm.rotation.x = 0;
+                rightArm.rotation.x = 0;
             }
 
-            // Kamera Roblox'dagidek orqasidan ergashadi
+            // Camera follow
             camera.position.x = playerGroup.position.x;
             camera.position.y = playerGroup.position.y + 8;
             camera.position.z = playerGroup.position.z + 12;
             camera.lookAt(playerGroup.position.x, playerGroup.position.y + 1, playerGroup.position.z);
 
-            // Tuxum O'g'irlash Logikasi
+            // Egg Pickup & Base Logic
             if (!carriedEgg) {
-                // Tuxumga yaqinlashganda avtomatik olish
                 for (let i = 0; i < eggs.length; i++) {
-                    const egg = eggs[i];
-                    const dist = playerGroup.position.distanceTo(egg.position);
-
-                    if (dist < 1.5) {
-                        carriedEgg = egg;
+                    if (playerGroup.position.distanceTo(eggs[i].position) < 1.5) {
+                        carriedEgg = eggs[i];
                         eggs.splice(i, 1);
                         document.getElementById('status-msg').style.display = 'block';
                         break;
                     }
                 }
             } else {
-                // Tuxum boshingiz ustida tebranib turadi
-                carriedEgg.position.set(
-                    playerGroup.position.x,
-                    playerGroup.position.y + 2.8,
-                    playerGroup.position.z
-                );
+                carriedEgg.position.set(playerGroup.position.x, playerGroup.position.y + 2.8, playerGroup.position.z);
 
-                // O'z bazangizga yetib kelganda tuxumni sotish
-                const distToBase = playerGroup.position.distanceTo(myBase.position);
-                if (distToBase < 4) {
-                    score += 500;
+                if (playerGroup.position.distanceTo(myBase.position) < 4) {
+                    score += 250;
                     document.getElementById('score').innerText = score;
-                    
                     scene.remove(carriedEgg);
                     carriedEgg = null;
                     document.getElementById('status-msg').style.display = 'none';
-
-                    // 2 soniyadan keyin markazda yangi tuxum paydo bo'ladi
                     setTimeout(() => createEgg(0, 0), 2000);
                 }
             }
 
             renderer.render(scene, camera);
         }
-
         animate();
 
-        // Oyna hajmi moslashishi
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
